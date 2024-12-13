@@ -20,6 +20,7 @@ from particle_ import Particle
     MAX_VEL,
     WALL_DAMP,
     VEL_DAMP,
+    GRID_CELL_SIZE
 ) = Config().return_config()
 
 
@@ -53,35 +54,38 @@ def start(
     return result
 
 
-def calculate_density(particles: list[Particle]) -> None:
+def calculate_density(particles: list[Particle], grid: dict, grid_cell_size: float) -> None:
     """
-    입자의 밀도를 계산합니다.
-        밀도는 이웃 입자 간의 상대 거리를 합산하여 계산됩니다.
-        입자가 서로 충돌하여 불안정성을 야기하는 것을 방지하기 위해
-        밀도와 근접 밀도를 구분하여 계산합니다.
+    Calculates the density and near-density of each particle.
 
     Args:
-        particles (list[Particle]): 입자 리스트
+        particles (list[Particle]): The list of particles.
+        grid (dict): The grid containing particles assigned to cells.
+        grid_cell_size (float): The size of each grid cell.
     """
-    for i, particle_1 in enumerate(particles):
-        density = 0.0
-        density_near = 0.0
-        # 주변 이웃간 밀도 계산
-        for particle_2 in particles[i + 1 :]:
-            distance = sqrt(
-                (particle_1.x_pos - particle_2.x_pos) ** 2
-                + (particle_1.y_pos - particle_2.y_pos) ** 2
-            )
-            if distance < R:
-                # 기본 거리 1로 설정
-                normal_distance = 1 - distance / R
-                density += normal_distance**2
-                density_near += normal_distance**3
-                particle_2.rho += normal_distance**2
-                particle_2.rho_near += normal_distance**3
-                particle_1.neighbors.append(particle_2)
-        particle_1.rho += density
-        particle_1.rho_near += density_near
+    for particle in particles:
+        particle.rho = 0.0
+        particle.rho_near = 0.0
+        particle.neighbors = []
+
+        cell_x = int((particle.x_pos + SIM_W) / grid_cell_size)
+        cell_y = int((particle.y_pos + SIM_W) / grid_cell_size)
+
+        # Iterate through neighboring cells (including the particle's own cell)
+        for i in range(cell_x - 1, cell_x + 2):
+            for j in range(cell_y - 1, cell_y + 2):
+                if (i, j) in grid:
+                    for neighbor in grid[(i, j)]:
+                        if particle != neighbor:  # Exclude self
+                            distance = sqrt(
+                                (particle.x_pos - neighbor.x_pos) ** 2
+                                + (particle.y_pos - neighbor.y_pos) ** 2
+                            )
+                            if distance < R:
+                                normal_distance = 1 - distance / R
+                                particle.rho += normal_distance**2
+                                particle.rho_near += normal_distance**3
+                                particle.neighbors.append(neighbor)
 
 
 def create_pressure(particles: list[Particle]) -> None:
@@ -161,3 +165,14 @@ def calculate_viscosity(particles: list[Particle]) -> None:
                 particle.y_vel -= viscosity_force[1] * 0.5
                 neighbor.x_vel += viscosity_force[0] * 0.5
                 neighbor.y_vel += viscosity_force[1] * 0.5
+
+def create_grid(particles: list[Particle], grid_cell_size: float) -> dict:
+    grid = {}
+    for particle in particles:
+        cell_x = int((particle.x_pos + SIM_W) / grid_cell_size)
+        cell_y = int((particle.y_pos + SIM_W) / grid_cell_size)
+        cell_coords = (cell_x, cell_y)
+        if cell_coords not in grid:
+            grid[cell_coords] = []
+        grid[cell_coords].append(particle)
+    return grid

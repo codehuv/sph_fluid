@@ -7,6 +7,7 @@ from physics import (
     calculate_density,
     create_pressure,
     calculate_viscosity,
+    create_grid
 )
 
 (
@@ -25,28 +26,35 @@ from physics import (
     MAX_VEL,
     WALL_DAMP,
     VEL_DAMP,
+    GRID_CELL_SIZE
 ) = Config().return_config()
 
 def update(particles: list[Particle], dam: bool) -> list[Particle]:
     """
-    시뮬레이션의 한 단계를 계산합니다.
+    Calculates one step of the simulation.
     """
-    # 입자 상태 업데이트 (힘 적용, 값 초기화 등)
+    # 1. 힘 초기화, 중력가속도 적용, 벽과의 상호작용
     for particle in particles:
-        particle.update_state(dam)
+        particle.force = np.array([0.0, -G], dtype=float)
+        #particle.update_state(dam) # 여기에서 불리면 안됨
 
-    # 밀도 계산
-    calculate_density(particles)
+    # 2. 밀도 계산
+    grid = create_grid(particles, GRID_CELL_SIZE)
+    calculate_density(particles, grid, GRID_CELL_SIZE)
 
-    # 압력 계산
+    # 3. 압력 계산
     for particle in particles:
         particle.calculate_pressure()
 
-    # 압력 힘 적용
+    # 4. 압력 힘 적용
     create_pressure(particles)
 
-    # 점성 힘 적용
+    # 5. 점성 힘 적용
     calculate_viscosity(particles)
+
+    # 6. 업데이트된 힘을 바탕으로 update_state 호출
+    for particle in particles:
+        particle.update_state(dam)
 
     return particles
 

@@ -1,7 +1,7 @@
 """Configuration file defining the simulation parameters."""
 
 # Simulation parameters
-N = 750  # Number of particles
+N = 1300  # Number of particles
 SIM_W = 3  # Simulation space width
 BOTTOM = 0  # Simulation space ground
 DAM = 0  # Position of the dam, simulation space is between -0.5 and 0.5
@@ -16,8 +16,9 @@ K_NEAR = K * 10  # Near pressure factor, pressure when particles are close to ea
 REST_DENSITY = 3.0
 # Neighbour radius, if the distance between two particles is less than R, they are neighbours
 R = SPACING * 1.25
+GRID_CELL_SIZE = R * 1.5
 #SIGMA = 1  # Viscosity factor
-SIGMA = 0  # Viscosity factor
+SIGMA = 2.5  # Viscosity factor
 MAX_VEL = 1.0  # Maximum velocity of particles, used to avoid instability
 # Wall constraints factor, how much the particle is pushed away from the simulation walls
 WALL_DAMP = 0.05
@@ -48,4 +49,5 @@ class Config:
             MAX_VEL,
             WALL_DAMP,
             VEL_DAMP,
+            GRID_CELL_SIZE
         )

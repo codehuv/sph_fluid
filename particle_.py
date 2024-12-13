@@ -18,6 +18,7 @@ from config import Config
     MAX_VEL,
     WALL_DAMP,
     VEL_DAMP,
+    GRID_CELL_SIZE
 ) = Config().return_config()
 
 
@@ -58,58 +59,60 @@ class Particle:
         self.x_force = 0.0
         self.y_force = -G
 
-    def update_state(self, dam: bool):
-        # 이전의 위치 초기화
-        (self.previous_x_pos, self.previous_y_pos) = (self.x_pos, self.y_pos)
+    def update_state(self, dam: bool, dt: float = 1.0):
+        """
+        Updates the particle's state using the Velocity Verlet integration method.
 
-        # 뉴턴의 제2 법칙과 오일러 적분을 사용하여 힘 적용 (질량 = 1, dt = 1)
-        (self.x_vel, self.y_vel) = (
-            self.x_vel + self.x_force,
-            self.y_vel + self.y_force,
-        )
+        Args:
+            dam (bool): Indicates whether the dam is present.
+            dt (float, optional): The time step. Defaults to 1.0.
+        """
 
-        # 오일러 적분(dt = 1)을 사용하여 속도에 따라 입자 이동
-        (self.x_pos, self.y_pos) = (self.x_pos + self.x_vel, self.y_pos + self.y_vel)
+        # 이전 위치 보존
+        self.previous_x_pos = self.x_pos
+        self.previous_y_pos = self.y_pos
+
+        # 1. 이전 속도와 현재 힘을 이용하여 속도의 절반 단계를 계산 (half-step velocity)
+        half_x_vel = self.x_vel + 0.5 * dt * self.x_force
+        half_y_vel = self.y_vel + 0.5 * dt * self.y_force
+
+        # 2. 절반 단계의 속도를 사용하여 위치 업데이트
+        self.x_pos += half_x_vel * dt
+        self.y_pos += half_y_vel * dt
+
+        # 3. 새로운 위치에서의 힘 계산은 바깥(main.py)에서 해 줄 예정
+
+        # 4. 새로운 위치에서 계산된 힘을 사용하여 속도 업데이트
+        self.x_vel = half_x_vel + 0.5 * dt * self.x_force
+        self.y_vel = half_y_vel + 0.5 * dt * self.y_force
 
         # 화면에 표시되는 시각적 위치 설정
-        # 불안정한 입자가 표시되지 않도록 하는 데 사용됨
-        (self.visual_x_pos, self.visual_y_pos) = (self.x_pos, self.y_pos)
-
+        self.visual_x_pos = self.x_pos
+        self.visual_y_pos = self.y_pos
+        
         # force 초기화
         (self.x_force, self.y_force) = (0.0, -G)
 
-        # 오일러 적분(dt = 1)을 사용하여 속도 정의
-        (self.x_vel, self.y_vel) = (
-            self.x_pos - self.previous_x_pos,
-            self.y_pos - self.previous_y_pos,
-        )
-
-        # 속도 계산
+        # 속도 계산 (Verlet에서는 덜 중요하지만, 필요에 따라 계산)
         velocity = sqrt(self.x_vel**2 + self.y_vel**2)
 
         # 속도가 너무 높으면 감소시킴
         if velocity > MAX_VEL:
-            self.x_vel *= VEL_DAMP
-            self.y_vel *= VEL_DAMP
+            reduction_ratio = MAX_VEL / velocity
+            self.x_vel *= reduction_ratio
+            self.y_vel *= reduction_ratio
 
-        # 벽 제약 조건, 입자가 범위를 벗어나면 복원력을 생성하여 되돌림
+        # 벽 제약 조건
         if self.x_pos < -SIM_W:
-            self.x_force -= 0.3*(self.x_pos - -SIM_W) * WALL_DAMP
+            self.x_force -= 0.3 * (self.x_pos - -SIM_W) * WALL_DAMP
             self.visual_x_pos = -SIM_W
-
-        # 댐 제약 조건, 댐이 dam에서 SIM_W로 이동하는 경우 적용, 사용 X
         if dam is True and self.x_pos > DAM:
             self.x_force -= (self.x_pos - DAM) * WALL_DAMP
-
-        # 오른쪽 벽 제약 조건
         if self.x_pos > SIM_W:
-            self.x_force -= 0.3*(self.x_pos - SIM_W) * WALL_DAMP
+            self.x_force -= 0.3 * (self.x_pos - SIM_W) * WALL_DAMP
             self.visual_x_pos = SIM_W
-
-        # 바닥 제약 조건
         if self.y_pos < BOTTOM:
-            # 입자가 너무 낮아지지 않도록 BOTTOM 대신 SIM_W를 사용
-            self.y_force -= 0.3*(self.y_pos - SIM_W) * WALL_DAMP
+            self.y_force -= 0.7 * (self.y_pos - SIM_W) * WALL_DAMP
             self.visual_y_pos = BOTTOM
 
         # 밀도 초기화
